@@ -65,11 +65,65 @@ Command Line Arguments
     -t, --duration: Time in seconds (default: 60)
     -z, --zed: Create map (default: 0, no)
 
+# RTL-SDR AI Signal Detection Server
+
+RTL-SDR AI Signal Detection Server is a Python script designed to stream samples from RTL-SDR devices over a socket connection.
+
+## Requirements
+
+- Python 3.x
+
+## Usage
+
+### 1. Install the required package:
+
+bash
+pip install numpy
+
+2. Clone the repository:
+
+bash
+
+git clone https://github.com/aplayerv1/rtlsdrAIdetect.git
+
+3. Navigate to the project directory:
+
+bash
+
+cd rtlsdrAIdetect
+
+4. Run the server:
+
+bash
+
+python server.py
+
+5. Close the server:
+
+Press Ctrl+C to close the server.
+Functionality
+
+    stream_samples: Stream samples from the RTL-SDR device over a socket connection.
+
+Command Line Arguments
+
+    -a, --address: Server IP address (default: localhost)
+    -p, --port: Server port (default: 8888)
+    -f, --frequency: Center frequency in Hz (default: 100e6)
+    -s, --sample-rate: Sample rate in Hz (default: 2.4e6)
+    -d, --duration: Time in seconds (default: 60)
+
 License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
-css
+kotlin
 
 
-You can use this README.md for your project. If you need to add more specific details or instr
+You can use this README.md for your server.py script. Feel free to adjust it as needed.
+
+
+
+
+
+

@@ -62,10 +62,18 @@ def create_model():
     model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
     return model
 
-def process_samples(samples, fs, lnb_offset):
+def process_samples(samples, fs, lnb_offset, low_cutoff, high_cutoff):
     """Process the received samples"""
     # Remove LNB effect
-    processed_samples = remove_lnb_effect(samples, fs, notch_freq, notch_width)
+    processed_samples = remove_lnb_effect(samples, fs, lnb_offset,notch_width)
+
+    # Apply bandpass filter
+    nyq_rate = fs / 2.0
+    low_cutoff = low_cutoff / nyq_rate
+    high_cutoff = high_cutoff / nyq_rate
+    b, a = scipy.signal.butter(4, [low_cutoff, high_cutoff], btype='bandpass')
+    processed_samples = scipy.signal.lfilter(b, a, processed_samples)
+
     return processed_samples
 
 def generate_wow_signal(n_samples=1024, freq=1420.40E6, drift_rate=10):
@@ -94,7 +102,7 @@ def train_model():
 
     # Create and train model
     model = create_model()
-    model.fit(X_train, y_train, epochs=20, batch_size=32)
+    model.fit(X_train, y_train, epochs=100, batch_size=128)
 
     # Save the trained weights
     model.save_weights('signal_classifier_weights.h5')
@@ -215,7 +223,9 @@ def main():
 
                 # Process samples if the buffer size is larger than a threshold
                 if len(buffer) >= 1024:  # Change the threshold as needed
-                    processed_samples = process_samples(buffer, args.sampling_frequency, notch_freq)
+                    low_cutoff = (1420.3e6 - notch_freq) / (args.sampling_frequency / 2.0)
+                    high_cutoff = (1420.5e6 - notch_freq) / (args.sampling_frequency / 2.0)
+                    processed_samples = process_samples(buffer, args.sampling_frequency, notch_freq, low_cutoff, high_cutoff)
                     strength = np.mean(np.abs(processed_samples))
                     signal_strength.append(strength)
                     threshold = 0.5

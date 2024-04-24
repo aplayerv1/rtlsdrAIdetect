@@ -1,13 +1,13 @@
 import logging
 import numpy as np
-from scipy.signal import lfilter
+from scipy.signal import lfilter, butter, freqz
 import argparse
 import socket
 import json
 import tensorflow as tf
 import matplotlib.pyplot as plt
 import time
-import gc 
+import gc
 import scipy.signal
 import datetime
 import os
@@ -20,7 +20,7 @@ fs = 10000
 # Low band LO frequency in MHz
 notch_freq = 9750
 # Notch width in MHz
-notch_width = 30  
+notch_width = 30
 
 def receive_samples_from_server(client_socket):
     """Receive samples from the server"""
@@ -71,8 +71,8 @@ def process_samples(samples, fs, lnb_offset, low_cutoff, high_cutoff):
     nyq_rate = fs / 2.0
     low_cutoff = low_cutoff / nyq_rate
     high_cutoff = high_cutoff / nyq_rate
-    b, a = scipy.signal.butter(4, [low_cutoff, high_cutoff], btype='bandpass')
-    processed_samples = scipy.signal.lfilter(b, a, processed_samples)
+    b, a = butter(4, [low_cutoff, high_cutoff], btype='bandpass')
+    processed_samples = lfilter(b, a, processed_samples)
 
     return processed_samples
 
@@ -92,8 +92,23 @@ def generate_noise_sample(n_samples=1024):
 def train_model():
     """Train the machine learning model"""
     # Generate training data
-    wow_signals = [generate_wow_signal(n_samples=1024) for _ in range(1000)]
-    noise_samples = [generate_noise_sample(n_samples=1024) for _ in range(1000)]
+    wow_signals = []
+    noise_samples = []
+    for _ in range(1000):
+        # Generate 'Wow!' signal with random amplitude, frequency, and noise level
+        amplitude = np.random.uniform(0.1, 0.5)
+        freq = np.random.uniform(1420.3e6, 1420.5e6)
+        noise_level = np.random.uniform(0.05, 0.2)
+        wow_signal = amplitude * generate_wow_signal(n_samples=1024, freq=freq, drift_rate=10)
+        noise = noise_level * generate_noise_sample(n_samples=1024)
+        wow_signal += noise
+        wow_signals.append(wow_signal)
+
+        # Generate noise sample with random noise level
+        noise_level = np.random.uniform(0.05, 0.2)
+        noise_sample = noise_level * generate_noise_sample(n_samples=1024)
+        noise_samples.append(noise_sample)
+
     X_train = np.concatenate([wow_signals, noise_samples])
     y_train = np.concatenate([np.ones(1000), np.zeros(1000)])
 
@@ -102,7 +117,7 @@ def train_model():
 
     # Create and train model
     model = create_model()
-    model.fit(X_train, y_train, epochs=100, batch_size=128)
+    model.fit(X_train, y_train, epochs=20, batch_size=32)
 
     # Save the trained weights
     model.save_weights('signal_classifier_weights.h5')
@@ -110,8 +125,23 @@ def train_model():
 def test_model(model):
     """Test the machine learning model"""
     # Generate test data
-    wow_signals = [generate_wow_signal(n_samples=1024) for _ in range(100)]
-    noise_samples = [generate_noise_sample(n_samples=1024) for _ in range(100)]
+    wow_signals = []
+    noise_samples = []
+    for _ in range(100):
+        # Generate 'Wow!' signal with random amplitude, frequency, and noise level
+        amplitude = np.random.uniform(0.1, 0.5)
+        freq = np.random.uniform(1420.3e6, 1420.5e6)
+        noise_level = np.random.uniform(0.05, 0.2)
+        wow_signal = amplitude * generate_wow_signal(n_samples=1024, freq=freq, drift_rate=10)
+        noise = noise_level * generate_noise_sample(n_samples=1024)
+        wow_signal += noise
+        wow_signals.append(wow_signal)
+
+        # Generate noise sample with random noise level
+        noise_level = np.random.uniform(0.05, 0.2)
+        noise_sample = noise_level * generate_noise_sample(n_samples=1024)
+        noise_samples.append(noise_sample)
+
     X_test = np.concatenate([wow_signals, noise_samples])
     y_test = np.concatenate([np.ones(100), np.zeros(100)])
 
@@ -129,10 +159,10 @@ def predict_signal(model, samples, threshold):
     """Predict if a signal is present"""
     # Reshape the input samples to the format the model expects
     reshaped_samples = samples[np.newaxis, :]
-    
+
     # Make the prediction
     confidence = model.predict(reshaped_samples)
-    
+
     # Return whether it's a signal or not based on the threshold
     return confidence[0][0] >= threshold
 
@@ -147,7 +177,7 @@ def plot_signal_strength(signal_strength, filename):
 
 def analyze_signal(samples):
     """Analyze the signal"""
-    # Take FFT    
+    # Take FFT
     fft = np.fft.fft(samples)
 
     # Frequency spectrum
@@ -164,10 +194,10 @@ def plot_spectrogram(signal, sample_rate, title='Spectrogram'):
     datime = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f'spectrograph_{datime}.png'
     # Set spectrogram parameters
-    nperseg = 1024 
+    nperseg = 1024
     noverlap = nperseg // 2
-    
-    # Take the spectrogram 
+
+    # Take the spectrogram
     f, t, Sxx = scipy.signal.spectrogram(signal, fs=sample_rate, nperseg=nperseg, noverlap=noverlap)
 
     # Plot the spectrogram
@@ -181,7 +211,6 @@ def plot_spectrogram(signal, sample_rate, title='Spectrogram'):
     fig.savefig(filename, dpi=300)
 
 def main():
-
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     client_socket.connect((args.server_address, args.server_port))
     signal_strength = []
@@ -234,7 +263,7 @@ def main():
 
                     if len(buffer_test) >= 1e8:
                         buffer_test.clear()
-                    
+
                     # Check if a signal is detected
                     if predict_signal(model, processed_samples,threshold):
                         psamples = process_samples
@@ -253,11 +282,10 @@ def main():
                         print(f"Dominant Frequency: {freq} Hz")
                         plot_spectrogram(np.array(buffer_test), args.sampling_frequency)
 
-                    buffer.clear()  
+                    buffer.clear()
 
                     if len(signal_strength) > threshold2:
                         signal_strength = []
-                               
 
                 time.sleep(0.2)
             except KeyboardInterrupt:
